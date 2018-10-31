@@ -1,0 +1,78 @@
+version: '3'
+
+services:
+
+  master:
+    container_name: spark_master
+    image: gettyimages/spark
+    command: bin/spark-class org.apache.spark.deploy.master.Master -h master
+    hostname: master
+    environment:
+      MASTER: spark://master:7077
+      SPARK_CONF_DIR: /conf
+      SPARK_PUBLIC_DNS: localhost
+    expose:
+      - 7001
+      - 7002
+      - 7003
+      - 7004
+      - 7005
+      - 7077
+      - 6066
+    ports:
+      - 4040:4040
+      - 6066:6066
+      - 7077:7077
+      - 8080:8080
+    volumes:
+      - ./conf/master:/conf
+      - ./data:/tmp/data
+
+  worker:
+    container_name: spark_worker
+    image: gettyimages/spark
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://master:7077
+    hostname: worker
+    environment:
+      SPARK_CONF_DIR: /conf
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 1g
+      SPARK_WORKER_PORT: 8881
+      SPARK_WORKER_WEBUI_PORT: 8081
+      SPARK_PUBLIC_DNS: localhost
+    links:
+      - master
+    expose:
+      - 7012
+      - 7013
+      - 7014
+      - 7015
+      - 8881
+    ports:
+      - 8081:8081
+    volumes:
+      - ./conf/worker:/conf
+      - ./data:/tmp/data
+
+  es:
+    container_name: es_index
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.1.1
+    volumes:
+      - ./es_data:/tmp/es_data
+    environment:
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - discovery.type=single-node
+    ports:
+      - 9300:9300
+      - 9200:9200
+
+  frontend:
+    build: ./frontend
+    restart: always
+    ports:
+      - 5000:5000
+    environment:
+      - "DOCKER_MACHINE_IP=0.0.0.0"
+    depends_on:
+      - es
